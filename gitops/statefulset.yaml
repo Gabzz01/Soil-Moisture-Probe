@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: influxdb
+  namespace: influxdb
+  labels:
+    app: influxdb
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: soil-moisture-probe
+spec:
+  serviceName: influxdb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+        app.kubernetes.io/name: influxdb
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: soil-moisture-probe
+    spec:
+      containers:
+        - name: influxdb
+          image: influxdb:3-core
+          imagePullPolicy: Always
+          command:
+            - influxdb3
+            - serve
+            - --node-id=influxdb-0
+            - --object-store=file
+            - --data-dir=/var/lib/influxdb3/data
+            - --admin-token-file=/etc/influxdb/admin-token.json
+            - --disable-authz=health,ping
+          ports:
+            - name: http
+              containerPort: 8181
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/influxdb3/data
+            - name: admin-token
+              mountPath: /etc/influxdb/admin-token.json
+              subPath: admin-token.json
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: admin-token
+          secret:
+            secretName: influxdb-admin-token
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: influxdb
+          app.kubernetes.io/component: database
+          app.kubernetes.io/part-of: soil-moisture-probe
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        # storageClassName: standard
