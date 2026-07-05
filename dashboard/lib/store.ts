@@ -1,3 +1,5 @@
+import { isValidPlantType } from "./plants.ts";
+
 const DATA_PATH = process.env.DATA_PATH ?? "./data.json";
 const VALID_PROBES = new Set(["1", "2", "3", "4"]);
 
@@ -15,6 +17,13 @@ const DEFAULT_EMOJIS: Record<string, string> = {
   "4": "",
 };
 
+const DEFAULT_PLANT_TYPES: Record<string, string> = {
+  "1": "",
+  "2": "",
+  "3": "",
+  "4": "",
+};
+
 export type Location = {
   name: string;
   latitude: number;
@@ -24,18 +33,21 @@ export type Location = {
 type DataFile = {
   probes: Record<string, string>;
   emojis?: Record<string, string>;
+  plantTypes?: Record<string, string>;
   location?: Location | null;
 };
 
 export type ProbeConfig = {
   names: Record<string, string>;
   emojis: Record<string, string>;
+  plantTypes: Record<string, string>;
 };
 
 function defaultData(): DataFile {
   return {
     probes: { ...DEFAULT_NAMES },
     emojis: { ...DEFAULT_EMOJIS },
+    plantTypes: { ...DEFAULT_PLANT_TYPES },
     location: null,
   };
 }
@@ -44,6 +56,7 @@ function normalizeData(data: DataFile): DataFile {
   return {
     probes: { ...DEFAULT_NAMES, ...data.probes },
     emojis: { ...DEFAULT_EMOJIS, ...(data.emojis ?? {}) },
+    plantTypes: { ...DEFAULT_PLANT_TYPES, ...(data.plantTypes ?? {}) },
     location: data.location ?? null,
   };
 }
@@ -81,7 +94,11 @@ export function displayName(probe: string, names: Record<string, string>): strin
 
 export async function loadProbeConfig(): Promise<ProbeConfig> {
   const data = await readData();
-  return { names: data.probes, emojis: data.emojis ?? { ...DEFAULT_EMOJIS } };
+  return {
+    names: data.probes,
+    emojis: data.emojis ?? { ...DEFAULT_EMOJIS },
+    plantTypes: data.plantTypes ?? { ...DEFAULT_PLANT_TYPES },
+  };
 }
 
 export async function loadProbeNames(): Promise<Record<string, string>> {
@@ -96,7 +113,7 @@ export async function loadProbeEmojis(): Promise<Record<string, string>> {
 
 export async function updateProbe(
   probe: string,
-  updates: { name?: string; emoji?: string },
+  updates: { name?: string; emoji?: string; plantType?: string },
 ): Promise<ProbeConfig> {
   if (!VALID_PROBES.has(probe)) {
     throw new Error(`Invalid probe id: ${probe}`);
@@ -104,8 +121,9 @@ export async function updateProbe(
 
   const hasName = updates.name !== undefined;
   const hasEmoji = updates.emoji !== undefined;
-  if (!hasName && !hasEmoji) {
-    throw new Error("At least one of name or emoji is required");
+  const hasPlantType = updates.plantType !== undefined;
+  if (!hasName && !hasEmoji && !hasPlantType) {
+    throw new Error("At least one of name, emoji, or plantType is required");
   }
 
   if (hasName) {
@@ -113,6 +131,10 @@ export async function updateProbe(
     if (!trimmed) {
       throw new Error("Name cannot be empty");
     }
+  }
+
+  if (hasPlantType && !isValidPlantType(updates.plantType!)) {
+    throw new Error(`Invalid plant type: ${updates.plantType}`);
   }
 
   const data = await readData();
@@ -124,9 +146,17 @@ export async function updateProbe(
     if (!data.emojis) data.emojis = { ...DEFAULT_EMOJIS };
     data.emojis[probe] = updates.emoji!;
   }
+  if (hasPlantType) {
+    if (!data.plantTypes) data.plantTypes = { ...DEFAULT_PLANT_TYPES };
+    data.plantTypes[probe] = updates.plantType!;
+  }
 
   await writeData(data);
-  return { names: data.probes, emojis: data.emojis ?? { ...DEFAULT_EMOJIS } };
+  return {
+    names: data.probes,
+    emojis: data.emojis ?? { ...DEFAULT_EMOJIS },
+    plantTypes: data.plantTypes ?? { ...DEFAULT_PLANT_TYPES },
+  };
 }
 
 export async function saveProbeName(

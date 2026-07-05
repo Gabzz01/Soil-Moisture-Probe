@@ -2,14 +2,20 @@
   "probes": {
     "1": "Big Lettuce Pot",
     "2": "Middle Tomato Pot",
-    "3": "Corner Tomato Pot",
-    "4": "Hanging Strawberry"
+    "3": "Strawberry",
+    "4": "Corner Tomato"
   },
   "emojis": {
     "1": "🥬",
     "2": "🍅",
-    "3": "🍅",
-    "4": "🍓"
+    "3": "🍓",
+    "4": "🍅"
+  },
+  "plantTypes": {
+    "1": "lettuce",
+    "2": "tomato",
+    "3": "strawberry",
+    "4": "tomato"
   },
   "location": {
     "name": "Islington, England, United Kingdom",

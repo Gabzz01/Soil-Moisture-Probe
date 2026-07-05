@@ -27,6 +27,7 @@ type ReadingsResponse = {
   series: Record<string, SeriesPoint[]>;
   names: Record<string, string>;
   emojis: Record<string, string>;
+  plantTypes: Record<string, string>;
   location: Location | null;
 };
 
@@ -38,6 +39,12 @@ const DEFAULT_NAMES: Record<string, string> = {
   "4": "Probe 4",
 };
 const DEFAULT_EMOJIS: Record<string, string> = {
+  "1": "",
+  "2": "",
+  "3": "",
+  "4": "",
+};
+const DEFAULT_PLANT_TYPES: Record<string, string> = {
   "1": "",
   "2": "",
   "3": "",
@@ -59,6 +66,7 @@ export default function App() {
   const [data, setData] = useState<ReadingsResponse | null>(null);
   const [names, setNames] = useState<Record<string, string>>(DEFAULT_NAMES);
   const [emojis, setEmojis] = useState<Record<string, string>>(DEFAULT_EMOJIS);
+  const [plantTypes, setPlantTypes] = useState<Record<string, string>>(DEFAULT_PLANT_TYPES);
   const [location, setLocation] = useState<Location | null>(null);
   const [weather, setWeather] = useState<WeatherPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +115,7 @@ export default function App() {
       setData(json);
       if (json.names) setNames(json.names);
       if (json.emojis) setEmojis(json.emojis);
+      if (json.plantTypes) setPlantTypes(json.plantTypes);
       if (json.location !== undefined) setLocation(json.location);
       await fetchWeather(json.location ?? null, json.series);
     } catch (err) {
@@ -117,7 +126,10 @@ export default function App() {
   }, [hours, fetchWeather]);
 
   const updateProbe = useCallback(
-    async (probe: string, updates: { name?: string; emoji?: string }) => {
+    async (
+      probe: string,
+      updates: { name?: string; emoji?: string; plantType?: string },
+    ) => {
       const res = await fetch(`/api/names/${probe}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -130,9 +142,11 @@ export default function App() {
       const json = (await res.json()) as {
         names: Record<string, string>;
         emojis: Record<string, string>;
+        plantTypes: Record<string, string>;
       };
       setNames(json.names);
       setEmojis(json.emojis);
+      setPlantTypes(json.plantTypes);
     },
     [],
   );
@@ -193,9 +207,11 @@ export default function App() {
                   probe={probe}
                   name={names[probe] ?? `Probe ${probe}`}
                   emoji={emojis[probe] ?? ""}
+                  plantType={plantTypes[probe] ?? ""}
                   reading={reading}
                   onRename={(name) => updateProbe(probe, { name })}
                   onEmojiChange={(emoji) => updateProbe(probe, { emoji })}
+                  onPlantTypeChange={(plantType) => updateProbe(probe, { plantType })}
                 />
               );
             })}

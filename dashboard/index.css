@@ -134,7 +134,7 @@ header h1 {
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -270,6 +270,131 @@ header h1 {
   color: #8b98a5;
 }
 
+.plant-type-picker {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.plant-type-picker-btn {
+  background: #0f1419;
+  border: 1px solid #38444d;
+  border-radius: 6px;
+  color: #8b98a5;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.plant-type-picker-btn:hover {
+  border-color: #1d9bf0;
+  color: #e7e9ea;
+}
+
+.plant-type-list {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #1e2732;
+  border: 1px solid #38444d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.plant-type-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #e7e9ea;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.plant-type-option:hover {
+  background: #253341;
+}
+
+.plant-type-option.selected {
+  background: #253341;
+  color: #1d9bf0;
+}
+
+.plant-type-range {
+  color: #6e767d;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.moisture-gauge {
+  position: relative;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.gauge-svg {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  margin: 0 auto;
+}
+
+.gauge-track {
+  stroke: #38444d;
+}
+
+.gauge-optimum {
+  stroke: #00ba7c;
+}
+
+.gauge-readout {
+  position: absolute;
+  left: 50%;
+  bottom: 0.15rem;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.gauge-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.moisture-status {
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-top: 0.1rem;
+}
+
+.moisture-status.optimal {
+  color: #00ba7c;
+}
+
+.moisture-status.dry {
+  color: #f7931a;
+}
+
+.moisture-status.wet {
+  color: #1d9bf0;
+}
+
+.moisture-status.neutral {
+  color: #6e767d;
+}
+
 .probe-card .humidity {
   font-size: 2rem;
   font-weight: 700;
@@ -280,22 +405,22 @@ header h1 {
   margin-top: 0.25rem;
   font-size: 0.8rem;
   color: #8b98a5;
+  text-align: center;
 }
 
 .probe-card .time {
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
   font-size: 0.75rem;
   color: #6e767d;
+  text-align: center;
 }
 
 .probe-card.stale {
   border-color: #f7931a;
 }
 
-.probe-card.stale .humidity::after {
+.probe-card.stale .moisture-status::after {
   content: " (held)";
-  font-size: 0.75rem;
-  font-weight: 400;
   color: #f7931a;
 }
 

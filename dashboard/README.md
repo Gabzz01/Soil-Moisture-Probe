@@ -51,3 +51,19 @@ Display names are stored in [`data.json`](data.json) under `probes`. Click the p
 ## Probe emojis
 
 Optional emojis are stored in `data.json` under `emojis`. Click the emoji button (or ➕ when empty) on a probe card to pick from a curated garden/plant set, or clear with ×. Labels show as e.g. `🥬 Big Lettuce Pot` on cards and the chart legend.
+
+## Plant type and moisture gauge
+
+Each probe has a **plant type** selector (stored in `data.json` under `plantTypes`). The semicircle gauge shows the current moisture % as a colored arc and marker, with a green band for the preset optimum range.
+
+| Plant | Optimum range |
+|-------|---------------|
+| Lettuce | 60–80% |
+| Tomato | 50–70% |
+| Strawberry | 60–80% |
+| Herbs | 45–65% |
+| Peppers | 50–70% |
+| Cucumber | 55–75% |
+| Succulent | 20–40% |
+
+Status labels: **Optimal** (green), **Too dry** (orange), **Too wet** (blue). These ranges are starting points for capacitive-style probe readings — tune per pot as needed.

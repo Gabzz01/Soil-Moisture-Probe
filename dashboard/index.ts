@@ -121,6 +121,7 @@ Bun.serve({
             ...normalizeReadings(rows),
             names: config.names,
             emojis: config.emojis,
+            plantTypes: config.plantTypes,
             location,
           });
         } catch (err) {
@@ -133,10 +134,18 @@ Bun.serve({
       PUT: async (req) => {
         try {
           const probe = req.params.probe;
-          const body = (await req.json()) as { name?: string; emoji?: string };
-          if (body.name === undefined && body.emoji === undefined) {
+          const body = (await req.json()) as {
+            name?: string;
+            emoji?: string;
+            plantType?: string;
+          };
+          if (
+            body.name === undefined &&
+            body.emoji === undefined &&
+            body.plantType === undefined
+          ) {
             return Response.json(
-              { error: "At least one of name or emoji is required" },
+              { error: "At least one of name, emoji, or plantType is required" },
               { status: 400 },
             );
           }
@@ -146,11 +155,19 @@ Bun.serve({
           if (body.emoji !== undefined && typeof body.emoji !== "string") {
             return Response.json({ error: "Invalid emoji" }, { status: 400 });
           }
+          if (body.plantType !== undefined && typeof body.plantType !== "string") {
+            return Response.json({ error: "Invalid plantType" }, { status: 400 });
+          }
           const config = await updateProbe(probe, {
             name: body.name,
             emoji: body.emoji,
+            plantType: body.plantType,
           });
-          return Response.json({ names: config.names, emojis: config.emojis });
+          return Response.json({
+            names: config.names,
+            emojis: config.emojis,
+            plantTypes: config.plantTypes,
+          });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           const status = message.startsWith("Invalid") || message.includes("empty") ? 400 : 500;

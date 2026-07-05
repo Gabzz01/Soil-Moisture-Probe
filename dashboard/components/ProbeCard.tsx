@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { formatLocalTime } from "../lib/time.ts";
+import { getPlantPreset } from "../lib/plants.ts";
 import EmojiPicker from "./EmojiPicker.tsx";
+import MoistureGauge from "./MoistureGauge.tsx";
+import PlantTypePicker from "./PlantTypePicker.tsx";
 
 type ProbeReading = {
   probe: string;
@@ -15,22 +18,27 @@ type Props = {
   probe: string;
   name: string;
   emoji: string;
+  plantType: string;
   reading?: ProbeReading;
   onRename: (name: string) => Promise<void>;
   onEmojiChange: (emoji: string) => Promise<void>;
+  onPlantTypeChange: (plantType: string) => Promise<void>;
 };
 
 export default function ProbeCard({
   name,
   emoji,
+  plantType,
   reading,
   onRename,
   onEmojiChange,
+  onPlantTypeChange,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const preset = getPlantPreset(plantType);
 
   useEffect(() => {
     setDraft(name);
@@ -102,6 +110,10 @@ export default function ProbeCard({
     return (
       <div className="probe-card">
         <h2 className="probe-title">{title}</h2>
+        <PlantTypePicker
+          plantType={plantType}
+          onSelect={(id) => onPlantTypeChange(id)}
+        />
         <div className="humidity">—</div>
         <div className="voltage">No data</div>
       </div>
@@ -114,7 +126,15 @@ export default function ProbeCard({
         {title}
         {channel && <span className="probe-channel">{channel}</span>}
       </h2>
-      <div className="humidity">{reading.humidity_pct.toFixed(1)}%</div>
+      <PlantTypePicker
+        plantType={plantType}
+        onSelect={(id) => onPlantTypeChange(id)}
+      />
+      <MoistureGauge
+        value={reading.humidity_pct}
+        preset={preset}
+        stale={reading.stale}
+      />
       <div className="voltage">{reading.voltage.toFixed(3)} V</div>
       <div className="time">{formatLocalTime(reading.time)}</div>
     </div>
