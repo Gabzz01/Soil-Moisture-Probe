@@ -7,7 +7,7 @@ DIY soil moisture probe with Raspberry Pi Zero 2. Reads 4 probes via ADS1115 and
 | Probe script | [`probe/`](probe/) | Reads sensors, writes to InfluxDB |
 | InfluxDB 3 Core | [`gitops/`](gitops/) | Time-series database (Kubernetes) |
 | InfluxDB 3 Explorer | [`gitops/explorer-*.yaml`](gitops/) | Web UI for queries (Kubernetes) |
-| Dashboard | [`dashboard/`](dashboard/) | Frontend (work in progress) |
+| Dashboard | [`dashboard/`](dashboard/) | Local React UI for probe readings — see [`dashboard/README.md`](dashboard/README.md) |
 
 Deploy InfluxDB first, then configure the Pi to send data to it.
 

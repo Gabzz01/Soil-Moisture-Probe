@@ -1,0 +1,129 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f1419;
+  color: #e7e9ea;
+  min-height: 100vh;
+}
+
+#root {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.range-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.range-toggle button {
+  background: #1e2732;
+  border: 1px solid #38444d;
+  color: #e7e9ea;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.range-toggle button.active {
+  background: #1d9bf0;
+  border-color: #1d9bf0;
+}
+
+.range-toggle button:hover:not(.active) {
+  background: #253341;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.probe-card {
+  background: #1e2732;
+  border: 1px solid #38444d;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.probe-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #8b98a5;
+}
+
+.probe-card .humidity {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.probe-card .voltage {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #8b98a5;
+}
+
+.probe-card .time {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #6e767d;
+}
+
+.probe-card.stale {
+  border-color: #f7931a;
+}
+
+.probe-card.stale .humidity::after {
+  content: " (held)";
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #f7931a;
+}
+
+.chart-section {
+  background: #1e2732;
+  border: 1px solid #38444d;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.chart-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.status {
+  text-align: center;
+  padding: 2rem;
+  color: #8b98a5;
+}
+
+.status.error {
+  color: #f4212e;
+}
