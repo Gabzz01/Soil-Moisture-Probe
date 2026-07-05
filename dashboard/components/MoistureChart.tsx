@@ -1,4 +1,5 @@
 import { formatLocalDateTime, toLocalMs } from "../lib/time.ts";
+import { probeLabel } from "../lib/labels.ts";
 import {
   CartesianGrid,
   Legend,
@@ -17,6 +18,8 @@ type SeriesPoint = {
 
 type Props = {
   series: Record<string, SeriesPoint[]>;
+  names: Record<string, string>;
+  emojis: Record<string, string>;
 };
 
 const COLORS = ["#1d9bf0", "#00ba7c", "#f7931a", "#f4212e"];
@@ -40,7 +43,7 @@ function buildChartData(series: Record<string, SeriesPoint[]>) {
   );
 }
 
-export default function MoistureChart({ series }: Props) {
+export default function MoistureChart({ series, names, emojis }: Props) {
   const data = buildChartData(series);
   const probes = Object.keys(series).sort();
 
@@ -68,7 +71,7 @@ export default function MoistureChart({ series }: Props) {
         />
         <Tooltip
           labelFormatter={(ts) => formatLocalDateTime(ts as number)}
-          formatter={(value: number) => [`${value.toFixed(1)}%`, ""]}
+          formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
           contentStyle={{
             background: "#1e2732",
             border: "1px solid #38444d",
@@ -81,7 +84,7 @@ export default function MoistureChart({ series }: Props) {
             key={probe}
             type="monotone"
             dataKey={`probe${probe}`}
-            name={`Probe ${probe}`}
+            name={probeLabel(names[probe] ?? `Probe ${probe}`, emojis[probe])}
             stroke={COLORS[i % COLORS.length]}
             dot={false}
             strokeWidth={2}

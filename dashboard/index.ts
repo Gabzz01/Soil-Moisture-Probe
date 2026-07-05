@@ -1,4 +1,5 @@
 import index from "./index.html";
+import { loadProbeConfig, updateProbe } from "./lib/store.ts";
 
 function influxBaseUrl(): string {
   let url = (process.env.INFLUXDB_URL ?? "https://influxdb").trim().replace(/\/$/, "");
@@ -110,11 +111,47 @@ Bun.serve({
         try {
           const url = new URL(req.url);
           const hours = Math.max(1, Number(url.searchParams.get("hours") ?? 24));
-          const rows = await queryInflux(hours);
-          return Response.json(normalizeReadings(rows));
+          const [rows, config] = await Promise.all([
+            queryInflux(hours),
+            loadProbeConfig(),
+          ]);
+          return Response.json({
+            ...normalizeReadings(rows),
+            names: config.names,
+            emojis: config.emojis,
+          });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+    "/api/names/:probe": {
+      PUT: async (req) => {
+        try {
+          const probe = req.params.probe;
+          const body = (await req.json()) as { name?: string; emoji?: string };
+          if (body.name === undefined && body.emoji === undefined) {
+            return Response.json(
+              { error: "At least one of name or emoji is required" },
+              { status: 400 },
+            );
+          }
+          if (body.name !== undefined && typeof body.name !== "string") {
+            return Response.json({ error: "Invalid name" }, { status: 400 });
+          }
+          if (body.emoji !== undefined && typeof body.emoji !== "string") {
+            return Response.json({ error: "Invalid emoji" }, { status: 400 });
+          }
+          const config = await updateProbe(probe, {
+            name: body.name,
+            emoji: body.emoji,
+          });
+          return Response.json({ names: config.names, emojis: config.emojis });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          const status = message.startsWith("Invalid") || message.includes("empty") ? 400 : 500;
+          return Response.json({ error: message }, { status });
         }
       },
     },

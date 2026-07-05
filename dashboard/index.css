@@ -76,6 +76,123 @@ header h1 {
   color: #8b98a5;
 }
 
+.probe-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.probe-name {
+  color: #e7e9ea;
+  font-weight: 600;
+}
+
+.probe-channel {
+  font-size: 0.75rem;
+  color: #6e767d;
+  font-weight: 400;
+}
+
+.probe-rename-btn {
+  background: none;
+  border: none;
+  color: #6e767d;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.probe-rename-btn:hover {
+  color: #1d9bf0;
+}
+
+.probe-name-input {
+  flex: 1;
+  min-width: 0;
+  background: #0f1419;
+  border: 1px solid #38444d;
+  border-radius: 4px;
+  color: #e7e9ea;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+}
+
+.probe-name-input:focus {
+  outline: none;
+  border-color: #1d9bf0;
+}
+
+.emoji-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.emoji-picker-btn {
+  background: #0f1419;
+  border: 1px solid #38444d;
+  border-radius: 6px;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.emoji-picker-btn:hover {
+  border-color: #1d9bf0;
+}
+
+.emoji-grid {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: #1e2732;
+  border: 1px solid #38444d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 9rem;
+}
+
+.emoji-option {
+  background: #0f1419;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.emoji-option:hover {
+  border-color: #38444d;
+  background: #253341;
+}
+
+.emoji-option.selected {
+  border-color: #1d9bf0;
+}
+
+.emoji-clear {
+  font-size: 1rem;
+  color: #8b98a5;
+}
+
 .probe-card .humidity {
   font-size: 2rem;
   font-weight: 700;
