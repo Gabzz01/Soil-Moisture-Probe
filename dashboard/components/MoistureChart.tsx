@@ -1,3 +1,4 @@
+import { formatLocalDateTime, toLocalMs } from "../lib/time.ts";
 import {
   CartesianGrid,
   Legend,
@@ -27,7 +28,7 @@ function buildChartData(series: Record<string, SeriesPoint[]>) {
     for (const { time, humidity_pct } of points) {
       const key = time;
       if (!byTime.has(key)) {
-        byTime.set(key, { time: new Date(time).getTime() });
+        byTime.set(key, { time: toLocalMs(time) });
       }
       const row = byTime.get(key)!;
       row[`probe${probe}`] = humidity_pct;
@@ -37,16 +38,6 @@ function buildChartData(series: Record<string, SeriesPoint[]>) {
   return Array.from(byTime.values()).sort(
     (a, b) => (a.time as number) - (b.time as number),
   );
-}
-
-function formatTick(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export default function MoistureChart({ series }: Props) {
@@ -65,7 +56,7 @@ export default function MoistureChart({ series }: Props) {
           dataKey="time"
           type="number"
           domain={["dataMin", "dataMax"]}
-          tickFormatter={formatTick}
+          tickFormatter={(ts) => formatLocalDateTime(ts as number)}
           stroke="#8b98a5"
           fontSize={12}
         />
@@ -76,7 +67,7 @@ export default function MoistureChart({ series }: Props) {
           fontSize={12}
         />
         <Tooltip
-          labelFormatter={(ts) => formatTick(ts as number)}
+          labelFormatter={(ts) => formatLocalDateTime(ts as number)}
           formatter={(value: number) => [`${value.toFixed(1)}%`, ""]}
           contentStyle={{
             background: "#1e2732",

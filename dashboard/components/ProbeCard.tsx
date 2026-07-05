@@ -1,3 +1,5 @@
+import { formatLocalDateTime } from "../lib/time.ts";
+
 type ProbeReading = {
   probe: string;
   channel: string;
@@ -11,14 +13,6 @@ type Props = {
   probe: string;
   reading?: ProbeReading;
 };
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
 
 export default function ProbeCard({ probe, reading }: Props) {
   if (!reading) {
@@ -38,7 +32,7 @@ export default function ProbeCard({ probe, reading }: Props) {
       </h2>
       <div className="humidity">{reading.humidity_pct.toFixed(1)}%</div>
       <div className="voltage">{reading.voltage.toFixed(3)} V</div>
-      <div className="time">{formatTime(reading.time)}</div>
+      <div className="time">{formatLocalDateTime(reading.time)}</div>
     </div>
   );
 }
