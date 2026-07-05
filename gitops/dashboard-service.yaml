@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: soil-moisture-dashboard
+  namespace: soil-moisture
+  labels:
+    app: soil-moisture-dashboard
+    app.kubernetes.io/name: soil-moisture-dashboard
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: soil-moisture-probe
+spec:
+  type: ClusterIP
+  selector:
+    app: soil-moisture-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

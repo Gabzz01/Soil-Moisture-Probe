@@ -27,6 +27,19 @@ Open **http://localhost:3000**.
 
 The server proxies InfluxDB queries so the token stays server-side. The UI shows four probe cards (latest reading) and a humidity chart with 24h / 7d range toggle. Data refreshes every 60 seconds.
 
+## Production (Kubernetes)
+
+Image: `ghcr.io/gabzz01/soil-moisture-probe/dashboard:latest` (built by CI on push to `main`).
+
+Public URL: **https://soil-moisture.rtz-developments.com**
+
+Deploy steps and secrets are in the root [`README.md`](../README.md#soil-moisture-dashboard-public). Set `DATA_PATH` via the deployment manifest (default `/data/data.json` on a PVC).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATA_PATH` | `./data.json` | Path to probe names/emojis/location JSON (use PVC in prod) |
+| `NODE_ENV` | — | Set to `production` in the container image |
+
 ## Weather overlay
 
 Search for a city in the header to load temperature from [Open-Meteo](https://open-meteo.com/) (free, no API key). The selected location is saved in [`data.json`](data.json) under `location`. Temperature uses 15-minute model data, matched to each sensor reading timestamp and shown as a dashed gold line on the right-hand °C axis.

@@ -7,7 +7,7 @@ DIY soil moisture probe with Raspberry Pi Zero 2. Reads 4 probes via ADS1115 and
 | Probe script | [`probe/`](probe/) | Reads sensors, writes to InfluxDB |
 | InfluxDB 3 Core | [`gitops/`](gitops/) | Time-series database (Kubernetes) |
 | InfluxDB 3 Explorer | [`gitops/explorer-*.yaml`](gitops/) | Web UI for queries (Kubernetes) |
-| Dashboard | [`dashboard/`](dashboard/) | Local React UI for probe readings — see [`dashboard/README.md`](dashboard/README.md) |
+| Dashboard | [`dashboard/`](dashboard/) | React UI for probe readings — local dev or Kubernetes (public) |
 
 Deploy InfluxDB first, then configure the Pi to send data to it.
 
@@ -21,6 +21,7 @@ Manifests live in [`gitops/`](gitops/). Access is via Tailscale ingress (`influx
 |-----------|----------------|-----------|
 | InfluxDB 3 Core | `influxdb` | `namespace.yaml`, `statefulset.yaml`, `service.yaml`, `ingress.yaml` |
 | InfluxDB 3 Explorer | `explorer` | `explorer-*.yaml` |
+| Dashboard | `soil-moisture.rtz-developments.com` (public) | `dashboard-*.yaml` |
 
 ### InfluxDB 3 Core
 
@@ -84,6 +85,34 @@ kubectl apply -f gitops/explorer-pvc.yaml \
 ```
 
 Open **https://explorer** on your Tailscale network.
+
+### Soil Moisture Dashboard (public)
+
+The dashboard is built as a Docker image on every push to `main` (see [`.github/workflows/dashboard.yml`](.github/workflows/dashboard.yml)) and published to:
+
+`ghcr.io/gabzz01/soil-moisture-probe/dashboard:latest`
+
+After the first CI run, make the GHCR package **public** (GitHub → Packages → package settings → Change visibility) so the cluster can pull without credentials.
+
+Requires InfluxDB Core to be running. The dashboard talks to InfluxDB over the cluster network; the token stays server-side.
+
+```bash
+# 1. Namespace and secret (re-use admin token from InfluxDB setup)
+kubectl apply -f gitops/dashboard-namespace.yaml
+
+kubectl -n soil-moisture create secret generic dashboard-env \
+  --from-literal=INFLUXDB_TOKEN="$(python3 -c 'import json; print(json.load(open("admin-token.json"))["token"])')"
+
+# 2. Deploy dashboard
+kubectl apply -f gitops/dashboard-pvc.yaml \
+               -f gitops/dashboard-deployment.yaml \
+               -f gitops/dashboard-service.yaml \
+               -f gitops/dashboard-ingressroute.yaml
+```
+
+Open **https://soil-moisture.rtz-developments.com** (DNS must point at your Traefik load balancer).
+
+Probe names, emojis, and weather location persist on a PVC (`dashboard-data`). Local development: see [`dashboard/README.md`](dashboard/README.md).
 
 ---
 

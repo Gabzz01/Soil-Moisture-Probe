@@ -1,4 +1,4 @@
-const DATA_PATH = "./data.json";
+const DATA_PATH = process.env.DATA_PATH ?? "./data.json";
 const VALID_PROBES = new Set(["1", "2", "3", "4"]);
 
 const DEFAULT_NAMES: Record<string, string> = {

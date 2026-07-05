@@ -1,0 +1,21 @@
+# Requires Traefik with an ACME certResolver named `default` already configured.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: soil-moisture
+  namespace: soil-moisture
+  labels:
+    app.kubernetes.io/name: soil-moisture-dashboard
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: soil-moisture-probe
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`soil-moisture.rtz-developments.com`)
+      kind: Rule
+      services:
+        - name: soil-moisture-dashboard
+          port: 80
+  tls:
+    certResolver: default

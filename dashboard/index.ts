@@ -239,10 +239,9 @@ Bun.serve({
       },
     },
   },
-  development: {
-    hmr: true,
-    console: true,
-  },
+  ...(process.env.NODE_ENV !== "production"
+    ? { development: { hmr: true, console: true } }
+    : {}),
 });
 
 console.log(`Dashboard running at http://localhost:${PORT}`);
