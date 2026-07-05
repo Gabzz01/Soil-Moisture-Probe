@@ -4,10 +4,16 @@ DIY soil moisture probe with Raspberry Pi Zero 2. Reads 4 probes via ADS1115 and
 
 ## Install (Pi)
 
+Enable I2C (`sudo raspi-config`), then install system and Python deps:
+
 ```bash
+sudo apt-get install -y i2c-tools libgpiod-dev python3-libgpiod python3-venv
+python3 -m venv venv --system-site-packages
+source venv/bin/activate
 pip install -r requirements.txt
-# Plus CircuitPython / Adafruit libs for ADS1115 (board, busio, adafruit_ads1x15)
 ```
+
+`requirements.txt` lists Adafruit Blinka and the ADS1115 driver. InfluxDB writes use the Python standard library only (no extra pip packages).
 
 ## InfluxDB admin token (Kubernetes)
 
@@ -53,8 +59,8 @@ Keep `admin-token.json` out of git. Use the same token on the Pi as `INFLUXDB_TO
 
 ```bash
 export INFLUXDB_TOKEN="$(python3 -c 'import json; print(json.load(open("admin-token.json"))["token"])')"
-# Optional overrides:
-# export INFLUXDB_URL="https://influxdb"
+# Optional overrides (hostname alone is fine — https:// is added automatically):
+# export INFLUXDB_URL="influxdb.tail3d44fe.ts.net"
 # export INFLUXDB_DATABASE="soil"
 
 python3 probes.py

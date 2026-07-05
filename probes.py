@@ -2,44 +2,45 @@
 import os
 import time
 import math
+from datetime import datetime
+import urllib.error
+import urllib.parse
+import urllib.request
 import board
 import busio
 import digitalio
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
-from influxdb_client_3 import InfluxDBClient3, Point
 
-# ---------- Parametres ----------
-V_EXC    = 3.3        # tension d'excitation reelle (a mesurer)
+# ---------- Parameters ----------
+V_EXC    = 3.3        # actual excitation voltage (measure on your board)
 R_SERIES = 10000
-V_AIR    = 2.6        # sec
-V_EAU    = 1.3        # sature
+V_AIR    = 2.6        # dry calibration
+V_WATER  = 1.3        # saturated calibration
 
-ADS_DATA_RATE = 128    # SPS bas -> echantillons plus calmes (def 128)
-N_MEDIANE     = 5     # mediane sur N lectures par canal (rejette les pics)
-EMA_ALPHA     = 0.25  # lissage temporel (petit = tres lisse)
-TEMPS_STAB    = 1
+ADS_DATA_RATE = 128    # low SPS -> calmer samples (default 128)
+N_MEDIAN      = 5      # median over N reads per channel (rejects spikes)
+EMA_ALPHA     = 0.25   # temporal smoothing (lower = smoother)
+SETTLE_TIME   = 1
 ITERATION_DELAY = 3
 
 # ---------- InfluxDB ----------
-INFLUXDB_URL = os.getenv("INFLUXDB_URL", "https://influxdb")
+def influx_base_url():
+    url = os.getenv("INFLUXDB_URL", "https://influxdb").strip().rstrip("/")
+    if not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+    return url
+
 INFLUXDB_DATABASE = os.getenv("INFLUXDB_DATABASE", "soil")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 
-influx_client = None
-if INFLUXDB_TOKEN:
-    influx_client = InfluxDBClient3(
-        host=INFLUXDB_URL,
-        database=INFLUXDB_DATABASE,
-        token=INFLUXDB_TOKEN,
-    )
-else:
-    print("INFLUXDB_TOKEN non defini — mode affichage seul (pas d'envoi InfluxDB)")
+if not INFLUXDB_TOKEN:
+    print("INFLUXDB_TOKEN not set — print-only mode (no InfluxDB writes)")
 
 # ---------- Excitation ----------
-alim = digitalio.DigitalInOut(board.D22)
-alim.direction = digitalio.Direction.OUTPUT
-alim.value = False
+power = digitalio.DigitalInOut(board.D22)
+power.direction = digitalio.Direction.OUTPUT
+power.value = False
 
 # ---------- Bus / ADS ----------
 def init_bus():
@@ -52,9 +53,9 @@ def init_bus():
 i2c, ads, channels = init_bus()
 
 def reset_bus():
-    """Recuperation propre : on reinitialise TOUT (jamais de retry en place)."""
+    """Clean recovery: reinitialize everything (never retry in place)."""
     global i2c, ads, channels
-    alim.value = False
+    power.value = False
     try:
         i2c.deinit()
     except Exception:
@@ -62,104 +63,119 @@ def reset_bus():
     time.sleep(0.3)
     i2c, ads, channels = init_bus()
 
-# ---------- Conversion humidite ----------
+# ---------- Humidity conversion ----------
 def v_to_r(v):
     v = min(max(v, 0.001), V_EXC - 0.001)
     return R_SERIES * v / (V_EXC - v)
 
-LN_SEC    = math.log(v_to_r(V_AIR))
-LN_SATURE = math.log(v_to_r(V_EAU))
+LN_DRY       = math.log(v_to_r(V_AIR))
+LN_SATURATED = math.log(v_to_r(V_WATER))
 
-def humidite_pct(v):
-    frac = (LN_SEC - math.log(v_to_r(v))) / (LN_SEC - LN_SATURE)
+def humidity_pct(v):
+    frac = (LN_DRY - math.log(v_to_r(v))) / (LN_DRY - LN_SATURATED)
     return max(0.0, min(100.0, 100.0 * frac))
 
 # ---------- InfluxDB write ----------
-def envoyer_influx(points):
-    if not points or influx_client is None:
-        return
-    try:
-        influx_client.write(points)
-    except Exception as exc:
-        print(f"Erreur envoi InfluxDB: {exc}")
+def format_line(probe, channel, voltage, humidity, stale):
+    ts = int(time.time())
+    return (
+        f"soil_moisture,probe={probe},channel={channel} "
+        f"voltage={voltage},humidity_pct={humidity},stale={stale}i {ts}"
+    )
 
-# ---------- Lecture ----------
-def lire_mediane(idx, n=N_MEDIANE):
-    """Mediane de n lectures. S'arrete des le 1er echec (evite de bloquer le bus)."""
+def send_to_influx(lines):
+    if not lines or not INFLUXDB_TOKEN:
+        return
+    params = urllib.parse.urlencode({"db": INFLUXDB_DATABASE, "precision": "second"})
+    url = f"{influx_base_url()}/api/v3/write_lp?{params}"
+    req = urllib.request.Request(
+        url,
+        data="\n".join(lines).encode(),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {INFLUXDB_TOKEN}",
+            "Content-Type": "text/plain",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        print(f"InfluxDB write error: {exc.code} {body}")
+    except Exception as exc:
+        print(f"InfluxDB write error: {exc}")
+
+# ---------- Reading ----------
+def read_median(idx, n=N_MEDIAN):
+    """Median of n reads. Stops on first failure (avoids blocking the bus)."""
     vals = []
     for _ in range(n):
         try:
             vals.append(channels[idx].voltage)
         except Exception:
-            break  # un echec -> on n'insiste pas sur ce canal
+            break  # one failure -> don't keep hammering this channel
     if not vals:
         return None
     vals.sort()
     return vals[len(vals) // 2]
 
-def lire_tous():
-    """Passage tolerant, puis UNE reprise apres reset propre pour les echecs."""
-    valeurs = [lire_mediane(i) for i in range(4)]
-    if any(v is None for v in valeurs):
-        reset_bus()                 # recuperation avant de retenter
-        alim.value = True
-        time.sleep(TEMPS_STAB)
+def read_all():
+    """Tolerant pass, then one retry after a clean reset for failures."""
+    values = [read_median(i) for i in range(4)]
+    if any(v is None for v in values):
+        reset_bus()
+        power.value = True
+        time.sleep(SETTLE_TIME)
         for i in range(4):
-            if valeurs[i] is None:
-                valeurs[i] = lire_mediane(i)
-    return valeurs
+            if values[i] is None:
+                values[i] = read_median(i)
+    return values
 
-# ---------- Lissage + derniere valeur connue ----------
+# ---------- Smoothing + last known value ----------
 ema = [None] * 4
 
-def lisser(idx, v):
+def smooth(idx, v):
     if v is None:
-        return ema[idx], True       # echec -> on garde la derniere valeur (perimee)
+        return ema[idx], True  # failure -> keep last value (stale)
     if ema[idx] is None:
         ema[idx] = v
     else:
         ema[idx] = EMA_ALPHA * v + (1 - EMA_ALPHA) * ema[idx]
     return ema[idx], False
 
-# ---------- Boucle ----------
+# ---------- Main loop ----------
 try:
     while True:
-        alim.value = True
-        time.sleep(TEMPS_STAB)
+        power.value = True
+        time.sleep(SETTLE_TIME)
         try:
-            _ = channels[0].voltage   # lecture a blanc : absorbe le 1er acces
+            _ = channels[0].voltage  # dummy read: absorbs first-access glitch
         except Exception:
             pass
 
-        brutes = lire_tous()
-        alim.value = False
+        raw = read_all()
+        power.value = False
 
-        points = []
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        lines = []
         for i in range(4):
-            v, perime = lisser(i, brutes[i])
+            v, stale = smooth(i, raw[i])
             if v is None:
-                print(f"Sonde {i+1} (A{i}): -- (pas encore de mesure)")
+                print(f"[{now}] Probe {i+1} (A{i}): -- (no reading yet)")
             else:
-                tag = "  [valeur retenue]" if perime else ""
-                print(f"Sonde {i+1} (A{i}): {v:.3f} V - {humidite_pct(v):.1f} %{tag}")
-                points.append(
-                    Point("soil_moisture")
-                    .tag("probe", str(i + 1))
-                    .tag("channel", f"A{i}")
-                    .field("voltage", v)
-                    .field("humidity_pct", humidite_pct(v))
-                    .field("stale", 1 if perime else 0)
-                )
+                tag = "  [held value]" if stale else ""
+                h = humidity_pct(v)
+                print(f"[{now}] Probe {i+1} (A{i}): {v:.3f} V - {h:.1f} %{tag}")
+                lines.append(format_line(i + 1, f"A{i}", v, h, 1 if stale else 0))
 
-        envoyer_influx(points)
+        send_to_influx(lines)
         print("-" * 30)
         time.sleep(ITERATION_DELAY)
 
 except KeyboardInterrupt:
-    print("\nArret du script...")
+    print("\nStopping...")
 
 finally:
-    alim.value = False
-    alim.deinit()
-    if influx_client is not None:
-        influx_client.close()
+    power.value = False
+    power.deinit()
