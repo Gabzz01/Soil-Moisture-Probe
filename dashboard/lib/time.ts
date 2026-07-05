@@ -5,6 +5,20 @@ export function parseInfluxTime(value: string): Date {
   return new Date(iso.endsWith("Z") ? iso : `${iso}Z`);
 }
 
+export function formatLocalTime(value: string | number | Date): string {
+  const d =
+    value instanceof Date
+      ? value
+      : typeof value === "number"
+        ? new Date(value)
+        : parseInfluxTime(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatLocalDateTime(value: string | number | Date): string {
   const d =
     value instanceof Date

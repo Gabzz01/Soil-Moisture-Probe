@@ -10,5 +10,10 @@
     "2": "🍅",
     "3": "🍅",
     "4": "🍓"
+  },
+  "location": {
+    "name": "Islington, England, United Kingdom",
+    "latitude": 51.53622,
+    "longitude": -0.10304
   }
 }

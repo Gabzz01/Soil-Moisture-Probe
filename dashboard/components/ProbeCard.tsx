@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { formatLocalDateTime } from "../lib/time.ts";
+import { formatLocalTime } from "../lib/time.ts";
 import EmojiPicker from "./EmojiPicker.tsx";
 
 type ProbeReading = {
@@ -116,7 +116,7 @@ export default function ProbeCard({
       </h2>
       <div className="humidity">{reading.humidity_pct.toFixed(1)}%</div>
       <div className="voltage">{reading.voltage.toFixed(3)} V</div>
-      <div className="time">{formatLocalDateTime(reading.time)}</div>
+      <div className="time">{formatLocalTime(reading.time)}</div>
     </div>
   );
 }

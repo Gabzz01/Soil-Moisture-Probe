@@ -31,6 +31,83 @@ header h1 {
   font-weight: 600;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.location-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.location-icon {
+  color: #8b98a5;
+  font-size: 1rem;
+}
+
+.location-input {
+  background: #1e2732;
+  border: 1px solid #38444d;
+  color: #e7e9ea;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  min-width: 12rem;
+}
+
+.location-input:focus {
+  outline: none;
+  border-color: #1d9bf0;
+}
+
+.location-input::placeholder {
+  color: #6e767d;
+}
+
+.location-results {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #1e2732;
+  border: 1px solid #38444d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.location-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #e7e9ea;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.location-result:hover:not(.muted) {
+  background: #253341;
+}
+
+.location-result.muted {
+  color: #6e767d;
+  cursor: default;
+  padding: 0.5rem 0.75rem;
+}
+
 .range-toggle {
   display: flex;
   gap: 0.5rem;

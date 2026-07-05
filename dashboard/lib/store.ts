@@ -15,9 +15,16 @@ const DEFAULT_EMOJIS: Record<string, string> = {
   "4": "",
 };
 
+export type Location = {
+  name: string;
+  latitude: number;
+  longitude: number;
+};
+
 type DataFile = {
   probes: Record<string, string>;
   emojis?: Record<string, string>;
+  location?: Location | null;
 };
 
 export type ProbeConfig = {
@@ -29,6 +36,7 @@ function defaultData(): DataFile {
   return {
     probes: { ...DEFAULT_NAMES },
     emojis: { ...DEFAULT_EMOJIS },
+    location: null,
   };
 }
 
@@ -36,6 +44,7 @@ function normalizeData(data: DataFile): DataFile {
   return {
     probes: { ...DEFAULT_NAMES, ...data.probes },
     emojis: { ...DEFAULT_EMOJIS, ...(data.emojis ?? {}) },
+    location: data.location ?? null,
   };
 }
 
@@ -134,4 +143,40 @@ export async function saveProbeEmoji(
 ): Promise<Record<string, string>> {
   const { emojis } = await updateProbe(probe, { emoji });
   return emojis;
+}
+
+export async function loadLocation(): Promise<Location | null> {
+  const data = await readData();
+  return data.location ?? null;
+}
+
+export async function saveLocation(location: Location): Promise<Location> {
+  const name = location.name.trim();
+  if (!name) {
+    throw new Error("Location name cannot be empty");
+  }
+  if (
+    !Number.isFinite(location.latitude) ||
+    location.latitude < -90 ||
+    location.latitude > 90
+  ) {
+    throw new Error("Invalid latitude");
+  }
+  if (
+    !Number.isFinite(location.longitude) ||
+    location.longitude < -180 ||
+    location.longitude > 180
+  ) {
+    throw new Error("Invalid longitude");
+  }
+
+  const data = await readData();
+  const saved: Location = {
+    name,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  };
+  data.location = saved;
+  await writeData(data);
+  return saved;
 }

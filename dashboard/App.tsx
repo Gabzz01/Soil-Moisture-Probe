@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import LocationSelector, { type Location } from "./components/LocationSelector.tsx";
 import MoistureChart from "./components/MoistureChart.tsx";
 import ProbeCard from "./components/ProbeCard.tsx";
 
@@ -16,11 +17,17 @@ type SeriesPoint = {
   humidity_pct: number;
 };
 
+type WeatherPoint = {
+  time: string;
+  temperature: number;
+};
+
 type ReadingsResponse = {
   probes: ProbeReading[];
   series: Record<string, SeriesPoint[]>;
   names: Record<string, string>;
   emojis: Record<string, string>;
+  location: Location | null;
 };
 
 const REFRESH_MS = 60_000;
@@ -37,13 +44,56 @@ const DEFAULT_EMOJIS: Record<string, string> = {
   "4": "",
 };
 
+function uniqueSensorTimes(series: Record<string, SeriesPoint[]>): string[] {
+  const times = new Set<string>();
+  for (const points of Object.values(series)) {
+    for (const p of points) {
+      times.add(p.time);
+    }
+  }
+  return [...times];
+}
+
 export default function App() {
   const [hours, setHours] = useState(24);
   const [data, setData] = useState<ReadingsResponse | null>(null);
   const [names, setNames] = useState<Record<string, string>>(DEFAULT_NAMES);
   const [emojis, setEmojis] = useState<Record<string, string>>(DEFAULT_EMOJIS);
+  const [location, setLocation] = useState<Location | null>(null);
+  const [weather, setWeather] = useState<WeatherPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchWeather = useCallback(
+    async (loc: Location | null, series: Record<string, SeriesPoint[]>) => {
+      if (!loc) {
+        setWeather([]);
+        return;
+      }
+      const times = uniqueSensorTimes(series);
+      if (times.length === 0) {
+        setWeather([]);
+        return;
+      }
+      try {
+        const params = new URLSearchParams({
+          lat: String(loc.latitude),
+          lon: String(loc.longitude),
+          times: times.join(","),
+        });
+        const res = await fetch(`/api/weather?${params}`);
+        if (!res.ok) {
+          setWeather([]);
+          return;
+        }
+        const json = (await res.json()) as { weather: WeatherPoint[] };
+        setWeather(json.weather ?? []);
+      } catch {
+        setWeather([]);
+      }
+    },
+    [],
+  );
 
   const fetchReadings = useCallback(async () => {
     try {
@@ -57,12 +107,14 @@ export default function App() {
       setData(json);
       if (json.names) setNames(json.names);
       if (json.emojis) setEmojis(json.emojis);
+      if (json.location !== undefined) setLocation(json.location);
+      await fetchWeather(json.location ?? null, json.series);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load readings");
     } finally {
       setLoading(false);
     }
-  }, [hours]);
+  }, [hours, fetchWeather]);
 
   const updateProbe = useCallback(
     async (probe: string, updates: { name?: string; emoji?: string }) => {
@@ -85,6 +137,16 @@ export default function App() {
     [],
   );
 
+  const handleLocationChange = useCallback(
+    (loc: Location) => {
+      setLocation(loc);
+      if (data?.series) {
+        fetchWeather(loc, data.series);
+      }
+    },
+    [fetchWeather, data?.series],
+  );
+
   useEffect(() => {
     setLoading(true);
     fetchReadings();
@@ -96,21 +158,24 @@ export default function App() {
     <>
       <header>
         <h1>Soil Moisture</h1>
-        <div className="range-toggle">
-          <button
-            type="button"
-            className={hours === 24 ? "active" : ""}
-            onClick={() => setHours(24)}
-          >
-            24h
-          </button>
-          <button
-            type="button"
-            className={hours === 168 ? "active" : ""}
-            onClick={() => setHours(168)}
-          >
-            7d
-          </button>
+        <div className="header-controls">
+          <LocationSelector location={location} onLocationChange={handleLocationChange} />
+          <div className="range-toggle">
+            <button
+              type="button"
+              className={hours === 24 ? "active" : ""}
+              onClick={() => setHours(24)}
+            >
+              24h
+            </button>
+            <button
+              type="button"
+              className={hours === 168 ? "active" : ""}
+              onClick={() => setHours(168)}
+            >
+              7d
+            </button>
+          </div>
         </div>
       </header>
 
@@ -138,7 +203,12 @@ export default function App() {
 
           <section className="chart-section">
             <h2>Humidity over time</h2>
-            <MoistureChart series={data.series} names={names} emojis={emojis} />
+            <MoistureChart
+              series={data.series}
+              names={names}
+              emojis={emojis}
+              weather={weather}
+            />
           </section>
         </>
       )}
