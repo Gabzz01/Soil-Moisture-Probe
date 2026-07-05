@@ -55,6 +55,33 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 Keep `admin-token.json` out of git. Use the same token on the Pi as `INFLUXDB_TOKEN` (see **Run** below).
 
+## InfluxDB 3 Explorer (Kubernetes)
+
+Explorer is a separate OSS UI (`influxdata/influxdb3-ui`). Create its secrets, then deploy:
+
+```bash
+kubectl -n influxdb create secret generic influxdb-explorer-session \
+  --from-literal=SESSION_SECRET_KEY=$(openssl rand -hex 32)
+
+kubectl -n influxdb create secret generic influxdb-explorer-config \
+  --from-literal=config.json="$(python3 -c "
+import json
+print(json.dumps({
+    'DEFAULT_INFLUX_SERVER': 'http://influxdb:8181',
+    'DEFAULT_INFLUX_DATABASE': 'soil',
+    'DEFAULT_API_TOKEN': json.load(open('admin-token.json'))['token'],
+    'DEFAULT_SERVER_NAME': 'Soil Moisture Probe',
+}))
+")"
+
+kubectl apply -f gitops/explorer-pvc.yaml \
+               -f gitops/explorer-deployment.yaml \
+               -f gitops/explorer-service.yaml \
+               -f gitops/explorer-ingress.yaml
+```
+
+Open **https://explorer** on your Tailscale network (TLS host `explorer`). Explorer connects to InfluxDB at `http://influxdb:8181` inside the cluster.
+
 ## Run
 
 ```bash
@@ -70,4 +97,9 @@ Without `INFLUXDB_TOKEN`, the script runs in print-only mode for hardware testin
 
 ## GitOps
 
-InfluxDB is deployed from [`gitops/`](gitops/). See manifests for Tailscale ingress and persistent storage.
+InfluxDB and Explorer are deployed from [`gitops/`](gitops/):
+
+| Component | Tailscale host | Manifests |
+|-----------|----------------|-----------|
+| InfluxDB 3 Core | `influxdb` | `statefulset.yaml`, `service.yaml`, `ingress.yaml` |
+| InfluxDB 3 Explorer | `explorer` | `explorer-*.yaml` |

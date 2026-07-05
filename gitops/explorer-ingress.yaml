@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: influxdb-explorer-ingress
+  namespace: influxdb
+  labels:
+    app.kubernetes.io/name: influxdb-explorer
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: soil-moisture-probe
+  annotations:
+    tailscale.com/proxy-group: ingress-proxies
+spec:
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - explorer
+  defaultBackend:
+    service:
+      name: influxdb-explorer
+      port:
+        number: 8080

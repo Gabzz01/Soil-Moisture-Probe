@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb-explorer
+  namespace: influxdb
+  labels:
+    app: influxdb-explorer
+    app.kubernetes.io/name: influxdb-explorer
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: soil-moisture-probe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb-explorer
+  template:
+    metadata:
+      labels:
+        app: influxdb-explorer
+        app.kubernetes.io/name: influxdb-explorer
+        app.kubernetes.io/component: ui
+        app.kubernetes.io/part-of: soil-moisture-probe
+    spec:
+      securityContext:
+        fsGroup: 1500
+      containers:
+        - name: explorer
+          image: influxdata/influxdb3-ui:1.9.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --mode=admin
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SESSION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-explorer-session
+                  key: SESSION_SECRET_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /db
+            - name: config
+              mountPath: /app-root/config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: influxdb-explorer-data
+        - name: config
+          secret:
+            secretName: influxdb-explorer-config
