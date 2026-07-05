@@ -4,16 +4,18 @@ DIY soil moisture probe with Raspberry Pi Zero 2. Reads 4 probes via ADS1115 and
 
 ## Install (Pi)
 
-Enable I2C (`sudo raspi-config`), then install system and Python deps:
+Enable I2C (`sudo raspi-config`), add your user to the `gpio` and `i2c` groups, then install system and Python deps:
 
 ```bash
+sudo usermod -aG gpio,i2c raspberry
 sudo apt-get install -y i2c-tools libgpiod-dev python3-libgpiod python3-venv
+cd probe
 python3 -m venv venv --system-site-packages
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` lists Adafruit Blinka and the ADS1115 driver. InfluxDB writes use the Python standard library only (no extra pip packages).
+`probe/requirements.txt` lists Adafruit Blinka and the ADS1115 driver. InfluxDB writes use the Python standard library only (no extra pip packages).
 
 ## InfluxDB admin token (Kubernetes)
 
@@ -84,16 +86,50 @@ Open **https://explorer** on your Tailscale network (TLS host `explorer`). Explo
 
 ## Run
 
+From the `probe/` directory:
+
 ```bash
+cd probe
+source venv/bin/activate
 export INFLUXDB_TOKEN="$(python3 -c 'import json; print(json.load(open("admin-token.json"))["token"])')"
 # Optional overrides (hostname alone is fine — https:// is added automatically):
 # export INFLUXDB_URL="influxdb.tail3d44fe.ts.net"
 # export INFLUXDB_DATABASE="soil"
 
-python3 probes.py
+python3 probes.py          # one reading, then exit (systemd default)
+python3 probes.py --loop   # continuous readings every 3 s (manual testing)
 ```
 
 Without `INFLUXDB_TOKEN`, the script runs in print-only mode for hardware testing.
+
+## Systemd (Pi)
+
+Run one reading every 10 minutes on the clock (`:00`, `:10`, `:20`, …).
+
+1. Edit paths in [`probe/systemd/soil-probe.service`](probe/systemd/soil-probe.service) if your clone is not at `/home/raspberry/soil-moisture-probe`.
+
+2. Create the environment file (do not commit):
+
+```bash
+sudo install -m 600 probe/soil-probe.env.example /etc/soil-probe/env
+sudo nano /etc/soil-probe/env   # set INFLUXDB_TOKEN and INFLUXDB_URL
+```
+
+3. Install and enable the timer:
+
+```bash
+sudo cp probe/systemd/soil-probe.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now soil-probe.timer
+```
+
+4. Verify:
+
+```bash
+systemctl status soil-probe.timer
+journalctl -u soil-probe.service -f
+sudo systemctl start soil-probe.service   # manual test run
+```
 
 ## GitOps
 

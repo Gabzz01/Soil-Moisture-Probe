@@ -1,0 +1,13 @@
+[Unit]
+Description=Soil moisture probe (one reading)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=raspberry
+Group=raspberry
+SupplementaryGroups=gpio i2c
+WorkingDirectory=/home/raspberry/soil-moisture-probe/probe
+EnvironmentFile=-/etc/soil-probe/env
+ExecStart=/home/raspberry/soil-moisture-probe/probe/venv/bin/python3 probes.py

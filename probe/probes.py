@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import time
 import math
@@ -33,9 +34,6 @@ def influx_base_url():
 
 INFLUXDB_DATABASE = os.getenv("INFLUXDB_DATABASE", "soil")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
-
-if not INFLUXDB_TOKEN:
-    print("INFLUXDB_TOKEN not set — print-only mode (no InfluxDB writes)")
 
 # ---------- Excitation ----------
 power = digitalio.DigitalInOut(board.D22)
@@ -144,38 +142,52 @@ def smooth(idx, v):
         ema[idx] = EMA_ALPHA * v + (1 - EMA_ALPHA) * ema[idx]
     return ema[idx], False
 
-# ---------- Main loop ----------
-try:
-    while True:
-        power.value = True
-        time.sleep(SETTLE_TIME)
-        try:
-            _ = channels[0].voltage  # dummy read: absorbs first-access glitch
-        except Exception:
-            pass
+def run_once():
+    power.value = True
+    time.sleep(SETTLE_TIME)
+    try:
+        _ = channels[0].voltage  # dummy read: absorbs first-access glitch
+    except Exception:
+        pass
 
-        raw = read_all()
-        power.value = False
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        lines = []
-        for i in range(4):
-            v, stale = smooth(i, raw[i])
-            if v is None:
-                print(f"[{now}] Probe {i+1} (A{i}): -- (no reading yet)")
-            else:
-                tag = "  [held value]" if stale else ""
-                h = humidity_pct(v)
-                print(f"[{now}] Probe {i+1} (A{i}): {v:.3f} V - {h:.1f} %{tag}")
-                lines.append(format_line(i + 1, f"A{i}", v, h, 1 if stale else 0))
-
-        send_to_influx(lines)
-        print("-" * 30)
-        time.sleep(ITERATION_DELAY)
-
-except KeyboardInterrupt:
-    print("\nStopping...")
-
-finally:
+    raw = read_all()
     power.value = False
-    power.deinit()
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = []
+    for i in range(4):
+        v, stale = smooth(i, raw[i])
+        if v is None:
+            print(f"[{now}] Probe {i+1} (A{i}): -- (no reading yet)")
+        else:
+            tag = "  [held value]" if stale else ""
+            h = humidity_pct(v)
+            print(f"[{now}] Probe {i+1} (A{i}): {v:.3f} V - {h:.1f} %{tag}")
+            lines.append(format_line(i + 1, f"A{i}", v, h, 1 if stale else 0))
+
+    send_to_influx(lines)
+    print("-" * 30)
+
+def main():
+    if not INFLUXDB_TOKEN:
+        print("INFLUXDB_TOKEN not set — print-only mode (no InfluxDB writes)")
+
+    parser = argparse.ArgumentParser(description="Read soil moisture probes and send to InfluxDB")
+    parser.add_argument("--loop", action="store_true", help="Run continuously (for manual testing)")
+    args = parser.parse_args()
+
+    try:
+        if args.loop:
+            while True:
+                run_once()
+                time.sleep(ITERATION_DELAY)
+        else:
+            run_once()
+    except KeyboardInterrupt:
+        print("\nStopping...")
+    finally:
+        power.value = False
+        power.deinit()
+
+if __name__ == "__main__":
+    main()
