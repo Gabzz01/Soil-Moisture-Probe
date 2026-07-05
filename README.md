@@ -2,33 +2,37 @@
 
 DIY soil moisture probe with Raspberry Pi Zero 2. Reads 4 probes via ADS1115 and sends measurements to InfluxDB 3 Core.
 
-## Install (Pi)
+| Component | Location | Role |
+|-----------|----------|------|
+| Probe script | [`probe/`](probe/) | Reads sensors, writes to InfluxDB |
+| InfluxDB 3 Core | [`gitops/`](gitops/) | Time-series database (Kubernetes) |
+| InfluxDB 3 Explorer | [`gitops/explorer-*.yaml`](gitops/) | Web UI for queries (Kubernetes) |
+| Dashboard | [`dashboard/`](dashboard/) | Frontend (work in progress) |
 
-Enable I2C (`sudo raspi-config`), add your user to the `gpio` and `i2c` groups, then install system and Python deps:
+Deploy InfluxDB first, then configure the Pi to send data to it.
+
+---
+
+## Kubernetes (GitOps)
+
+Manifests live in [`gitops/`](gitops/). Access is via Tailscale ingress (`influxdb`, `explorer`).
+
+| Component | Tailscale host | Manifests |
+|-----------|----------------|-----------|
+| InfluxDB 3 Core | `influxdb` | `namespace.yaml`, `statefulset.yaml`, `service.yaml`, `ingress.yaml` |
+| InfluxDB 3 Explorer | `explorer` | `explorer-*.yaml` |
+
+### InfluxDB 3 Core
+
+InfluxDB 3 Core requires an admin token at startup. Generate it offline with Docker, then create the Kubernetes secret. Do not commit `admin-token.json`.
 
 ```bash
-sudo usermod -aG gpio,i2c raspberry
-sudo apt-get install -y i2c-tools libgpiod-dev python3-libgpiod python3-venv
-cd probe
-python3 -m venv venv --system-site-packages
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-`probe/requirements.txt` lists Adafruit Blinka and the ADS1115 driver. InfluxDB writes use the Python standard library only (no extra pip packages).
-
-## InfluxDB admin token (Kubernetes)
-
-InfluxDB 3 Core requires an admin token at startup. Generate it offline with Docker, then create the Kubernetes secret (do not commit the token file).
-
-```bash
-# 1. Generate admin-token.json locally (token must start with apiv3_)
+# 1. Generate admin-token.json (token must start with apiv3_)
 docker run --rm -v "$PWD:/out" influxdb:3-core \
   influxdb3 create token --admin --offline \
   --name admin \
   --output-file /out/admin-token.json
 
-# Verify format before creating the secret
 python3 -c 'import json; t=json.load(open("admin-token.json"))["token"]; assert t.startswith("apiv3_"), f"invalid token: {t[:20]}..."'
 
 # 2. Create namespace and secret
@@ -50,16 +54,13 @@ curl -s -X POST "https://influxdb/api/v3/configure/database" \
   -H "Content-Type: application/json" \
   -d '{"db":"soil"}'
 
-# Verify the database exists (expect "soil" in the output)
 curl -s -H "Authorization: Bearer $TOKEN" \
   "https://influxdb/api/v3/configure/database?format=pretty" | grep soil
 ```
 
-Keep `admin-token.json` out of git. Use the same token on the Pi as `INFLUXDB_TOKEN` (see **Run** below).
+### InfluxDB 3 Explorer
 
-## InfluxDB 3 Explorer (Kubernetes)
-
-Explorer is a separate OSS UI (`influxdata/influxdb3-ui`). Create its secrets, then deploy:
+Explorer is a separate OSS UI (`influxdata/influxdb3-ui`). Requires InfluxDB Core to be running.
 
 ```bash
 kubectl -n influxdb create secret generic influxdb-explorer-session \
@@ -82,60 +83,80 @@ kubectl apply -f gitops/explorer-pvc.yaml \
                -f gitops/explorer-ingress.yaml
 ```
 
-Open **https://explorer** on your Tailscale network (TLS host `explorer`). Explorer connects to InfluxDB at `http://influxdb:8181` inside the cluster.
+Open **https://explorer** on your Tailscale network.
 
-## Run
+---
 
-From the `probe/` directory:
+## Raspberry Pi probe
+
+### Prerequisites
+
+- Enable I2C: `sudo raspi-config`
+- Add your user to `gpio` and `i2c`: `sudo usermod -aG gpio,i2c raspberry` (log out and back in)
+
+### Install
+
+```bash
+sudo apt-get install -y i2c-tools libgpiod-dev python3-libgpiod python3-venv
+cd probe
+python3 -m venv venv --system-site-packages
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+`requirements.txt` lists Adafruit Blinka and the ADS1115 driver. InfluxDB writes use the Python standard library only.
+
+### Configuration
+
+Copy `admin-token.json` from the Kubernetes setup to the Pi. Set these environment variables (or use the systemd env file below):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INFLUXDB_TOKEN` | — | Admin token from `admin-token.json` (required for writes) |
+| `INFLUXDB_URL` | `https://influxdb` | InfluxDB hostname (`https://` added automatically if omitted) |
+| `INFLUXDB_DATABASE` | `soil` | Database name |
+
+Without `INFLUXDB_TOKEN`, the script runs in print-only mode for hardware testing.
+
+### Manual run
 
 ```bash
 cd probe
 source venv/bin/activate
 export INFLUXDB_TOKEN="$(python3 -c 'import json; print(json.load(open("admin-token.json"))["token"])')"
-# Optional overrides (hostname alone is fine — https:// is added automatically):
 # export INFLUXDB_URL="influxdb.tail3d44fe.ts.net"
-# export INFLUXDB_DATABASE="soil"
 
-python3 probes.py          # one reading, then exit (systemd default)
-python3 probes.py --loop   # continuous readings every 3 s (manual testing)
+python3 probes.py          # one reading, then exit
+python3 probes.py --loop   # continuous readings every 3 s
 ```
 
-Without `INFLUXDB_TOKEN`, the script runs in print-only mode for hardware testing.
+### Systemd timer
 
-## Systemd (Pi)
+Runs one reading every 10 minutes on the clock (`:00`, `:10`, `:20`, …). Default paths assume the repo is cloned to `/home/raspberry/Soil-Moisture-Probe`.
 
-Run one reading every 10 minutes on the clock (`:00`, `:10`, `:20`, …).
-
-1. Edit paths in [`probe/systemd/soil-probe.service`](probe/systemd/soil-probe.service) if your clone is not at `/home/raspberry/soil-moisture-probe`.
-
-2. Create the environment file (do not commit):
+**Environment file** — create `/etc/soil-probe/env` (do not commit):
 
 ```bash
+sudo mkdir -p /etc/soil-probe
 sudo install -m 600 probe/soil-probe.env.example /etc/soil-probe/env
-sudo nano /etc/soil-probe/env   # set INFLUXDB_TOKEN and INFLUXDB_URL
+sudo nano /etc/soil-probe/env
 ```
 
-3. Install and enable the timer:
+**Service and timer** — verify the venv exists, then install:
 
 ```bash
+ls probe/venv/bin/python3   # must exist
+
 sudo cp probe/systemd/soil-probe.{service,timer} /etc/systemd/system/
+# Edit paths in soil-probe.service if your clone is elsewhere
 sudo systemctl daemon-reload
 sudo systemctl enable --now soil-probe.timer
 ```
 
-4. Verify:
+**Verify:**
 
 ```bash
+sudo systemctl start soil-probe.service   # manual test
+journalctl -u soil-probe.service -n 20
 systemctl status soil-probe.timer
-journalctl -u soil-probe.service -f
-sudo systemctl start soil-probe.service   # manual test run
 ```
-
-## GitOps
-
-InfluxDB and Explorer are deployed from [`gitops/`](gitops/):
-
-| Component | Tailscale host | Manifests |
-|-----------|----------------|-----------|
-| InfluxDB 3 Core | `influxdb` | `statefulset.yaml`, `service.yaml`, `ingress.yaml` |
-| InfluxDB 3 Explorer | `explorer` | `explorer-*.yaml` |
