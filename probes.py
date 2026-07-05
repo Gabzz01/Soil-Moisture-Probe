@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import time
 import math
 import board
@@ -6,6 +7,7 @@ import busio
 import digitalio
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
+from influxdb_client_3 import InfluxDBClient3, Point
 
 # ---------- Parametres ----------
 V_EXC    = 3.3        # tension d'excitation reelle (a mesurer)
@@ -18,6 +20,22 @@ N_MEDIANE     = 5     # mediane sur N lectures par canal (rejette les pics)
 EMA_ALPHA     = 0.25  # lissage temporel (petit = tres lisse)
 TEMPS_STAB    = 1
 ITERATION_DELAY = 3
+
+# ---------- InfluxDB ----------
+INFLUXDB_URL = os.getenv("INFLUXDB_URL", "https://influxdb")
+INFLUXDB_DATABASE = os.getenv("INFLUXDB_DATABASE", "soil")
+INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
+
+influx_client = None
+if INFLUXDB_TOKEN:
+    influx_client = InfluxDBClient3(
+        host=INFLUXDB_URL,
+        database=INFLUXDB_DATABASE,
+        token=INFLUXDB_TOKEN,
+    )
+else:
+    print("INFLUXDB_TOKEN non defini — mode affichage seul (pas d'envoi InfluxDB)")
+
 # ---------- Excitation ----------
 alim = digitalio.DigitalInOut(board.D22)
 alim.direction = digitalio.Direction.OUTPUT
@@ -55,6 +73,15 @@ LN_SATURE = math.log(v_to_r(V_EAU))
 def humidite_pct(v):
     frac = (LN_SEC - math.log(v_to_r(v))) / (LN_SEC - LN_SATURE)
     return max(0.0, min(100.0, 100.0 * frac))
+
+# ---------- InfluxDB write ----------
+def envoyer_influx(points):
+    if not points or influx_client is None:
+        return
+    try:
+        influx_client.write(points)
+    except Exception as exc:
+        print(f"Erreur envoi InfluxDB: {exc}")
 
 # ---------- Lecture ----------
 def lire_mediane(idx, n=N_MEDIANE):
@@ -107,6 +134,7 @@ try:
         brutes = lire_tous()
         alim.value = False
 
+        points = []
         for i in range(4):
             v, perime = lisser(i, brutes[i])
             if v is None:
@@ -114,6 +142,16 @@ try:
             else:
                 tag = "  [valeur retenue]" if perime else ""
                 print(f"Sonde {i+1} (A{i}): {v:.3f} V - {humidite_pct(v):.1f} %{tag}")
+                points.append(
+                    Point("soil_moisture")
+                    .tag("probe", str(i + 1))
+                    .tag("channel", f"A{i}")
+                    .field("voltage", v)
+                    .field("humidity_pct", humidite_pct(v))
+                    .field("stale", 1 if perime else 0)
+                )
+
+        envoyer_influx(points)
         print("-" * 30)
         time.sleep(ITERATION_DELAY)
 
@@ -123,3 +161,5 @@ except KeyboardInterrupt:
 finally:
     alim.value = False
     alim.deinit()
+    if influx_client is not None:
+        influx_client.close()
