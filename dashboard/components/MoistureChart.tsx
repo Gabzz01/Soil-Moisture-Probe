@@ -1,5 +1,7 @@
 import { formatLocalTime, toLocalMs } from "../lib/time.ts";
 import { probeLabel } from "../lib/labels.ts";
+import type { HourlyWeatherPoint } from "../lib/openmeteo.ts";
+import { WeatherTimeline } from "./WeatherTimeline.tsx";
 import {
   CartesianGrid,
   Legend,
@@ -16,20 +18,17 @@ type SeriesPoint = {
   humidity_pct: number;
 };
 
-type WeatherPoint = {
-  time: string;
-  temperature: number;
-};
-
 type Props = {
   series: Record<string, SeriesPoint[]>;
   names: Record<string, string>;
   emojis: Record<string, string>;
-  weather: WeatherPoint[];
+  hourlyWeather: HourlyWeatherPoint[];
+  rangeHours: number;
 };
 
 const COLORS = ["#1d9bf0", "#00ba7c", "#f7931a", "#f4212e"];
 const TEMP_COLOR = "#ffd166";
+const WEATHER_STRIP_MARGIN = 56;
 
 type TimePoint = { time: number };
 
@@ -39,15 +38,15 @@ function toProbeLineData(points: SeriesPoint[]): Array<TimePoint & { humidity: n
     .sort((a, b) => a.time - b.time);
 }
 
-function toWeatherLineData(
-  weather: WeatherPoint[],
+function toHourlyLineData(
+  hourly: HourlyWeatherPoint[],
 ): Array<TimePoint & { temperature: number }> {
-  return weather
-    .map((w) => ({ time: toLocalMs(w.time), temperature: w.temperature }))
+  return hourly
+    .map((h) => ({ time: toLocalMs(h.time), temperature: h.temperature }))
     .sort((a, b) => a.time - b.time);
 }
 
-function computeSensorTimeDomain(
+export function computeSensorTimeDomain(
   series: Record<string, SeriesPoint[]>,
 ): [number, number] | undefined {
   const times: number[] = [];
@@ -60,13 +59,13 @@ function computeSensorTimeDomain(
   return [Math.min(...times), Math.max(...times)];
 }
 
-function filterWeatherToDomain(
-  weather: WeatherPoint[],
+function filterHourlyToDomain(
+  hourly: HourlyWeatherPoint[],
   domain: [number, number],
-): WeatherPoint[] {
+): HourlyWeatherPoint[] {
   const [min, max] = domain;
-  return weather.filter((w) => {
-    const t = toLocalMs(w.time);
+  return hourly.filter((h) => {
+    const t = toLocalMs(h.time);
     return t >= min && t <= max;
   });
 }
@@ -78,13 +77,20 @@ function formatTooltipValue(value: number, name: string): [string, string] {
   return [`${value.toFixed(1)}%`, name];
 }
 
-export default function MoistureChart({ series, names, emojis, weather }: Props) {
+export default function MoistureChart({
+  series,
+  names,
+  emojis,
+  hourlyWeather,
+  rangeHours,
+}: Props) {
   const probes = Object.keys(series).sort();
   const xDomain = computeSensorTimeDomain(series);
   const hasProbeData = xDomain !== undefined;
-  const weatherData = hasProbeData
-    ? toWeatherLineData(filterWeatherToDomain(weather, xDomain))
+  const filteredHourly = hasProbeData
+    ? filterHourlyToDomain(hourlyWeather, xDomain)
     : [];
+  const weatherData = toHourlyLineData(filteredHourly);
   const hasWeather = weatherData.length > 0;
 
   if (!hasProbeData) {
@@ -92,8 +98,18 @@ export default function MoistureChart({ series, names, emojis, weather }: Props)
   }
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <LineChart margin={{ top: 5, right: hasWeather ? 40 : 20, left: 0, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={hasWeather ? 376 : 320}>
+      <LineChart
+        margin={{
+          top: hasWeather ? WEATHER_STRIP_MARGIN : 5,
+          right: hasWeather ? 40 : 20,
+          left: 0,
+          bottom: 5,
+        }}
+      >
+        {hasWeather && (
+          <WeatherTimeline hourlyWeather={filteredHourly} rangeHours={rangeHours} />
+        )}
         <CartesianGrid stroke="#38444d" strokeDasharray="3 3" />
         <XAxis
           dataKey="time"

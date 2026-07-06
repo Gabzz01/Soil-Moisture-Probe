@@ -42,7 +42,9 @@ Deploy steps and secrets are in the root [`README.md`](../README.md#soil-moistur
 
 ## Weather overlay
 
-Search for a city in the header to load temperature from [Open-Meteo](https://open-meteo.com/) (free, no API key). The selected location is saved in [`data.json`](data.json) under `location`. Temperature uses 15-minute model data, matched to each sensor reading timestamp and shown as a dashed gold line on the right-hand °C axis.
+Search for a city in the header to load weather from [Open-Meteo](https://open-meteo.com/) (free, no API key). The selected location is saved in [`data.json`](data.json) under `location`.
+
+An integrated hourly weather strip appears above the humidity chart when a location is set: WMO weather-code icons and temperature labels aligned to the chart time axis. On the 24h view every hour is shown; on 7d every 6 hours. Temperature is also drawn as a dashed gold line on the right-hand °C axis, using hourly model data for the chart time range.
 
 ## Probe names
 
