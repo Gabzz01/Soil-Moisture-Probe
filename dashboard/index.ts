@@ -1,5 +1,9 @@
 import index from "./index.html";
-import { fetchTemperatureForSensorTimes, searchLocations } from "./lib/openmeteo.ts";
+import {
+  fetchHourlyWeather,
+  fetchTemperatureForSensorTimes,
+  searchLocations,
+} from "./lib/openmeteo.ts";
 import { loadLocation, loadProbeConfig, saveLocation, updateProbe } from "./lib/store.ts";
 
 function influxBaseUrl(): string {
@@ -249,6 +253,31 @@ Bun.serve({
 
           const weather = await fetchTemperatureForSensorTimes(lat, lon, times);
           return Response.json({ weather });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          return Response.json({ error: message }, { status: 500 });
+        }
+      },
+    },
+    "/api/weather/hourly": {
+      GET: async (req) => {
+        try {
+          const url = new URL(req.url);
+          const lat = Number(url.searchParams.get("lat"));
+          const lon = Number(url.searchParams.get("lon"));
+          const start = Number(url.searchParams.get("start"));
+          const end = Number(url.searchParams.get("end"));
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            return Response.json({ error: "lat and lon are required" }, { status: 400 });
+          }
+
+          if (!Number.isFinite(start) || !Number.isFinite(end)) {
+            return Response.json({ error: "start and end are required" }, { status: 400 });
+          }
+
+          const hourly = await fetchHourlyWeather(lat, lon, start, end);
+          return Response.json({ hourly });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           return Response.json({ error: message }, { status: 500 });

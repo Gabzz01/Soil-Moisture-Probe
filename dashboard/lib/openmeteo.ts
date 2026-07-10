@@ -13,6 +13,12 @@ export type WeatherPoint = {
   temperature: number;
 };
 
+export type HourlyWeatherPoint = {
+  time: string;
+  temperature: number;
+  weatherCode: number;
+};
+
 type GeocodingResponse = {
   results?: Array<{
     name: string;
@@ -30,7 +36,16 @@ type Minutely15Response = {
   };
 };
 
+type HourlyResponse = {
+  hourly?: {
+    time: string[];
+    temperature_2m: number[];
+    weather_code: number[];
+  };
+};
+
 const BUCKET_MS = 15 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 function toUtcMs(time: string): number {
   return parseInfluxTime(time).getTime();
@@ -42,6 +57,10 @@ function nearest15MinBucketMs(ms: number): number {
 
 function toOpenMeteoMinute(ms: number): string {
   return new Date(ms).toISOString().slice(0, 16);
+}
+
+function toOpenMeteoHour(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 13) + ":00";
 }
 
 export async function searchLocations(query: string): Promise<GeocodingResult[]> {
@@ -138,6 +157,51 @@ export async function fetchTemperatureForSensorTimes(
     if (temperature == null) continue;
 
     points.push({ time, temperature });
+  }
+
+  return points;
+}
+
+export async function fetchHourlyWeather(
+  latitude: number,
+  longitude: number,
+  startMs: number,
+  endMs: number,
+): Promise<HourlyWeatherPoint[]> {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+    return [];
+  }
+
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", String(latitude));
+  url.searchParams.set("longitude", String(longitude));
+  url.searchParams.set("hourly", "weather_code,temperature_2m");
+  url.searchParams.set("start_hour", toOpenMeteoHour(startMs - HOUR_MS));
+  url.searchParams.set("end_hour", toOpenMeteoHour(endMs + HOUR_MS));
+  url.searchParams.set("timezone", "UTC");
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Hourly weather fetch failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as HourlyResponse;
+  const hourly = data.hourly;
+  if (!hourly?.time?.length) {
+    return [];
+  }
+
+  const points: HourlyWeatherPoint[] = [];
+  for (let i = 0; i < hourly.time.length; i++) {
+    const time = hourly.time[i]!;
+    const temperature = hourly.temperature_2m[i];
+    const weatherCode = hourly.weather_code[i];
+    if (temperature == null || weatherCode == null) continue;
+
+    const ms = toUtcMs(time);
+    if (ms < startMs || ms > endMs) continue;
+
+    points.push({ time, temperature, weatherCode });
   }
 
   return points;

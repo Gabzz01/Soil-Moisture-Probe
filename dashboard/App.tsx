@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import LocationSelector, { type Location } from "./components/LocationSelector.tsx";
-import MoistureChart from "./components/MoistureChart.tsx";
+import MoistureChart, { computeSensorTimeDomain } from "./components/MoistureChart.tsx";
 import ProbeCard from "./components/ProbeCard.tsx";
+import type { HourlyWeatherPoint } from "./lib/openmeteo.ts";
 
 type ProbeReading = {
   probe: string;
@@ -15,11 +16,6 @@ type ProbeReading = {
 type SeriesPoint = {
   time: string;
   humidity_pct: number;
-};
-
-type WeatherPoint = {
-  time: string;
-  temperature: number;
 };
 
 type ReadingsResponse = {
@@ -51,16 +47,6 @@ const DEFAULT_PLANT_TYPES: Record<string, string> = {
   "4": "",
 };
 
-function uniqueSensorTimes(series: Record<string, SeriesPoint[]>): string[] {
-  const times = new Set<string>();
-  for (const points of Object.values(series)) {
-    for (const p of points) {
-      times.add(p.time);
-    }
-  }
-  return [...times];
-}
-
 export default function App() {
   const [hours, setHours] = useState(24);
   const [data, setData] = useState<ReadingsResponse | null>(null);
@@ -68,36 +54,37 @@ export default function App() {
   const [emojis, setEmojis] = useState<Record<string, string>>(DEFAULT_EMOJIS);
   const [plantTypes, setPlantTypes] = useState<Record<string, string>>(DEFAULT_PLANT_TYPES);
   const [location, setLocation] = useState<Location | null>(null);
-  const [weather, setWeather] = useState<WeatherPoint[]>([]);
+  const [hourlyWeather, setHourlyWeather] = useState<HourlyWeatherPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchWeather = useCallback(
+  const fetchHourlyWeatherData = useCallback(
     async (loc: Location | null, series: Record<string, SeriesPoint[]>) => {
       if (!loc) {
-        setWeather([]);
+        setHourlyWeather([]);
         return;
       }
-      const times = uniqueSensorTimes(series);
-      if (times.length === 0) {
-        setWeather([]);
+      const domain = computeSensorTimeDomain(series);
+      if (!domain) {
+        setHourlyWeather([]);
         return;
       }
       try {
         const params = new URLSearchParams({
           lat: String(loc.latitude),
           lon: String(loc.longitude),
-          times: times.join(","),
+          start: String(domain[0]),
+          end: String(domain[1]),
         });
-        const res = await fetch(`/api/weather?${params}`);
+        const res = await fetch(`/api/weather/hourly?${params}`);
         if (!res.ok) {
-          setWeather([]);
+          setHourlyWeather([]);
           return;
         }
-        const json = (await res.json()) as { weather: WeatherPoint[] };
-        setWeather(json.weather ?? []);
+        const json = (await res.json()) as { hourly: HourlyWeatherPoint[] };
+        setHourlyWeather(json.hourly ?? []);
       } catch {
-        setWeather([]);
+        setHourlyWeather([]);
       }
     },
     [],
@@ -117,13 +104,13 @@ export default function App() {
       if (json.emojis) setEmojis(json.emojis);
       if (json.plantTypes) setPlantTypes(json.plantTypes);
       if (json.location !== undefined) setLocation(json.location);
-      await fetchWeather(json.location ?? null, json.series);
+      await fetchHourlyWeatherData(json.location ?? null, json.series);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load readings");
     } finally {
       setLoading(false);
     }
-  }, [hours, fetchWeather]);
+  }, [hours, fetchHourlyWeatherData]);
 
   const updateProbe = useCallback(
     async (
@@ -155,10 +142,10 @@ export default function App() {
     (loc: Location) => {
       setLocation(loc);
       if (data?.series) {
-        fetchWeather(loc, data.series);
+        fetchHourlyWeatherData(loc, data.series);
       }
     },
-    [fetchWeather, data?.series],
+    [fetchHourlyWeatherData, data?.series],
   );
 
   useEffect(() => {
@@ -223,7 +210,8 @@ export default function App() {
               series={data.series}
               names={names}
               emojis={emojis}
-              weather={weather}
+              hourlyWeather={hourlyWeather}
+              rangeHours={hours}
             />
           </section>
         </>

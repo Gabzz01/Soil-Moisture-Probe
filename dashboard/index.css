@@ -437,6 +437,28 @@ header h1 {
   font-weight: 500;
 }
 
+.weather-timeline-slot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 2px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.weather-timeline-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.weather-timeline-temp {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: #ffd166;
+}
+
 .status {
   text-align: center;
   padding: 2rem;
